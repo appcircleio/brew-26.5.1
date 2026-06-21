@@ -831,6 +831,50 @@ module RuboCop
         end
       end
 
+      # This cop makes sure that the default completion shells are not passed to
+      # `generate_completions_from_executable`, as `[:bash, :zsh, :fish]` is the default.
+      class RedundantGenerateCompletionsShells < FormulaCop
+        include RangeHelp
+        extend AutoCorrector
+
+        DEFAULT_COMPLETION_SHELLS = [:bash, :zsh, :fish].freeze
+
+        sig { override.params(formula_nodes: FormulaNodes).void }
+        def audit_formula(formula_nodes)
+          install = find_method_def(formula_nodes.body_node, :install)
+          return if install.blank?
+
+          find_every_method_call_by_name(install, :generate_completions_from_executable).each do |method|
+            kwargs = method.arguments.last
+            next unless kwargs&.hash_type?
+
+            shells_pair = T.cast(kwargs, RuboCop::AST::HashNode).pairs.find do |pair|
+              pair.key.sym_type? && pair.key.value == :shells
+            end
+            next if shells_pair.nil?
+
+            shells = shells_pair.value
+            next unless shells.array_type?
+            next unless shells.values.all?(&:sym_type?)
+
+            shell_names = shells.values.map(&:value)
+            next if (DEFAULT_COMPLETION_SHELLS - shell_names).any? # a default shell is missing
+            next if (shell_names - DEFAULT_COMPLETION_SHELLS).any? # a non-default shell is present
+
+            offending_node(shells_pair)
+            problem "Omit `shells:` as `[:bash, :zsh, :fish]` is the default for " \
+                    "`generate_completions_from_executable`." do |corrector|
+              corrector.remove(
+                range_with_surrounding_comma(
+                  range_with_surrounding_space(range: shells_pair.source_range, side: :left),
+                  :left,
+                ),
+              )
+            end
+          end
+        end
+      end
+
       # This cop checks for other miscellaneous style violations.
       class Miscellaneous < FormulaCop
         sig { override.params(formula_nodes: FormulaNodes).void }
