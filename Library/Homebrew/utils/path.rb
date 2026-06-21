@@ -13,8 +13,66 @@ module Utils
     end
 
     sig { params(formula_name: String).returns(Pathname) }
+    def self.formula_opt_prefix(formula_name)
+      HOMEBREW_PREFIX/"opt/#{formula_name_from_full_name(formula_name)}"
+    end
+
+    sig { params(formula_name: String).returns(Pathname) }
+    def formula_opt_prefix(formula_name)
+      Utils::Path.formula_opt_prefix(formula_name)
+    end
+
+    sig { params(formula_name: String).returns(Pathname) }
     def self.formula_opt_bin(formula_name)
-      HOMEBREW_PREFIX/"opt/#{formula_name}/bin"
+      formula_opt_prefix(formula_name)/"bin"
+    end
+
+    sig { params(formula_name: String).returns(Pathname) }
+    def formula_opt_bin(formula_name)
+      Utils::Path.formula_opt_bin(formula_name)
+    end
+
+    sig { params(formula_name: String).returns(Pathname) }
+    def self.formula_opt_lib(formula_name)
+      formula_opt_prefix(formula_name)/"lib"
+    end
+
+    sig { params(formula_name: String).returns(Pathname) }
+    def formula_opt_lib(formula_name)
+      Utils::Path.formula_opt_lib(formula_name)
+    end
+
+    sig { params(formula_name: String).returns(Pathname) }
+    def self.formula_opt_libexec(formula_name)
+      formula_opt_prefix(formula_name)/"libexec"
+    end
+
+    sig { params(formula_name: String).returns(Pathname) }
+    def formula_opt_libexec(formula_name)
+      Utils::Path.formula_opt_libexec(formula_name)
+    end
+
+    sig { params(formula_names: T.any(String, T::Array[String])).returns(T::Array[Pathname]) }
+    def self.formula_installed_prefixes(formula_names)
+      Array(formula_names).map { |formula_name| HOMEBREW_CELLAR/formula_name_from_full_name(formula_name) }
+                          .select(&:directory?)
+                          .flat_map(&:subdirs)
+                          .sort_by(&:basename)
+    end
+
+    sig { params(formula_names: T.any(String, T::Array[String])).returns(T::Array[Pathname]) }
+    def formula_installed_prefixes(formula_names)
+      Utils::Path.formula_installed_prefixes(formula_names)
+    end
+
+    sig { params(formula_names: T.any(String, T::Array[String])).returns(T::Boolean) }
+    def self.formula_any_version_installed?(formula_names)
+      formula_installed_prefixes(formula_names).any? { |keg| (keg/"INSTALL_RECEIPT.json").file? }
+    end
+
+    sig { params(formula_names: T.any(String, T::Array[String])).returns(T::Boolean) }
+    def formula_any_version_installed?(formula_names)
+      Utils::Path.formula_any_version_installed?(formula_names)
     end
 
     sig { params(formula_name: String, paths: PATH::Elements).returns(PATH) }
@@ -22,9 +80,19 @@ module Utils
       PATH.new(formula_opt_bin(formula_name), *paths, ENV.fetch("PATH"))
     end
 
+    sig { params(formula_name: String, paths: PATH::Elements).returns(PATH) }
+    def formula_opt_bin_path(formula_name, *paths)
+      Utils::Path.formula_opt_bin_path(formula_name, *paths)
+    end
+
     sig { params(formula_name: String, paths: PATH::Elements).returns(T::Hash[String, String]) }
     def self.formula_opt_bin_env(formula_name, *paths)
       { "PATH" => formula_opt_bin_path(formula_name, *paths).to_s }
+    end
+
+    sig { params(formula_name: String, paths: PATH::Elements).returns(T::Hash[String, String]) }
+    def formula_opt_bin_env(formula_name, *paths)
+      Utils::Path.formula_opt_bin_env(formula_name, *paths)
     end
 
     sig { params(path: Pathname, package_type: Symbol).returns(T::Boolean) }
@@ -73,5 +141,12 @@ module Utils
       Pathname(path).expand_path.to_s
     end
     private_class_method :trusted_package_root
+
+    sig { params(formula_name: String).returns(String) }
+    def self.formula_name_from_full_name(formula_name)
+      _, _, name = formula_name.split("/", 3)
+      name || formula_name
+    end
+    private_class_method :formula_name_from_full_name
   end
 end
